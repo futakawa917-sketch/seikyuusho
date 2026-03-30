@@ -9,14 +9,14 @@ import calendar
 import sys
 from datetime import datetime, timezone
 
-from src.gmail_client import get_gmail_service, fetch_invoice_emails, mark_as_processed
+from src.gmail_client import get_gmail_service, fetch_invoice_emails, mark_as_processed, find_password_from_sender, _extract_email_address
 from src.drive_client import (
     get_drive_service, ensure_monthly_folder, upload_file, upload_text_as_file,
     save_invoice_data, load_monthly_invoice_data,
 )
 from src.invoice_parser import parse_pdf, parse_text
 from src.line_notifier import send_notification, format_invoice_summary, format_monthly_summary
-from src.downloader import find_and_download_pdfs
+from src.downloader import find_and_download_pdfs, try_download_with_password
 
 
 def process_invoices():
@@ -55,9 +55,31 @@ def process_invoices():
                     invoice_data = parse_pdf(attachment["data"])
 
         # PDF添付がない場合、メール本文のリンクからPDFダウンロードを試みる
+        failed_urls = []
         if not email["attachments"] and email["body"]:
             print("    🔗 ダウンロードリンクを探索中...")
-            downloaded, failed_urls = find_and_download_pdfs(email["body"])
+            downloaded, failed_urls, needs_password = find_and_download_pdfs(email["body"])
+
+            # パスワード付きページがある場合、同じ送信元からパスワードを探す
+            if needs_password:
+                sender_addr = _extract_email_address(email["sender"])
+                print("    🔑 パスワードを同じ送信元のメールから探索中...")
+                password = find_password_from_sender(gmail, sender_addr)
+
+                if password:
+                    print("    🔑 パスワード発見、ダウンロード試行中...")
+                    for page_info in needs_password:
+                        result = try_download_with_password(page_info, password)
+                        if result:
+                            downloaded.append(result)
+                            print("    📎 パスワード認証でPDF取得成功: {}".format(result["filename"]))
+                        else:
+                            failed_urls.append(page_info["url"])
+                            print("    ⚠️ パスワード認証でダウンロードできませんでした")
+                else:
+                    print("    ⚠️ パスワードが見つかりませんでした（手動確認が必要）")
+                    for page_info in needs_password:
+                        failed_urls.append(page_info["url"])
 
             for dl_file in downloaded:
                 print("    📎 リンクからPDF保存: {}".format(dl_file["filename"]))
@@ -67,21 +89,14 @@ def process_invoices():
                     print("    🔍 PDF解析中...")
                     invoice_data = parse_pdf(dl_file["data"])
 
-            if failed_urls:
-                print("    ⚠️ ダウンロードできないリンクあり（手動確認が必要）")
-
         # それでも解析できない場合はメール本文で解析
         if invoice_data is None and email["body"]:
             print("    🔍 メール本文を解析中...")
             invoice_data = parse_text(email["body"], email["subject"], email["sender"])
 
         # ダウンロードできなかったリンクがある場合、通知に追記
-        if invoice_data and not email["attachments"]:
-            try:
-                if failed_urls:
-                    invoice_data["manual_download"] = "手動DL必要: " + ", ".join(failed_urls[:2])
-            except NameError:
-                pass
+        if invoice_data and failed_urls:
+            invoice_data["manual_download"] = "手動DL必要: " + ", ".join(failed_urls[:2])
 
         if invoice_data:
             invoice_data["email_subject"] = email["subject"]

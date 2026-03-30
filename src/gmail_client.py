@@ -102,6 +102,72 @@ def mark_as_processed(service, message_id, user_id="me"):
     ).execute()
 
 
+def find_password_from_sender(service, sender_email, user_id="me"):
+    """同じ送信元の直近メールからパスワードを探す。
+
+    Args:
+        service: Gmail APIサービス
+        sender_email: 送信者メールアドレス
+        user_id: ユーザーID
+
+    Returns:
+        str or None: 見つかったパスワード文字列
+    """
+    import re
+
+    # 送信元からの直近メールを検索（パスワード関連キーワード）
+    query = "from:{} (パスワード OR password OR PW OR pw) newer_than:7d".format(sender_email)
+    results = service.users().messages().list(userId=user_id, q=query, maxResults=5).execute()
+    messages = results.get("messages", [])
+
+    for msg_meta in messages:
+        msg = service.users().messages().get(
+            userId=user_id, id=msg_meta["id"], format="full"
+        ).execute()
+        body = _extract_body(msg["payload"])
+        if not body:
+            continue
+
+        password = _extract_password_from_text(body)
+        if password:
+            return password
+
+    return None
+
+
+def _extract_password_from_text(text):
+    """テキストからパスワードを抽出する。"""
+    import re
+
+    # よくあるパスワード記載パターン
+    patterns = [
+        r'パスワード[：:\s]*([A-Za-z0-9!@#$%^&*()_+\-=]{4,20})',
+        r'password[：:\s]*([A-Za-z0-9!@#$%^&*()_+\-=]{4,20})',
+        r'PW[：:\s]*([A-Za-z0-9!@#$%^&*()_+\-=]{4,20})',
+        r'pw[：:\s]*([A-Za-z0-9!@#$%^&*()_+\-=]{4,20})',
+        r'暗証番号[：:\s]*([A-Za-z0-9]{4,20})',
+        r'認証コード[：:\s]*([A-Za-z0-9]{4,20})',
+    ]
+
+    for pattern in patterns:
+        match = re.search(pattern, text)
+        if match:
+            return match.group(1)
+
+    return None
+
+
+def _extract_email_address(sender):
+    """送信者文字列からメールアドレスを抽出する。"""
+    import re
+    match = re.search(r'<([^>]+)>', sender)
+    if match:
+        return match.group(1)
+    if "@" in sender:
+        return sender.strip()
+    return sender
+
+
 def _extract_body(payload):
     """メールペイロードから本文テキストを抽出する。"""
     if payload.get("mimeType", "").startswith("text/plain"):
