@@ -88,5 +88,10 @@ if __name__ == "__main__":
         process_invoices()
     except Exception as e:
         print(f"❌ エラーが発生しました: {e}", file=sys.stderr)
-        send_notification(f"\n⚠️ 請求書処理でエラーが発生しました:\n{e}")
+        import traceback
+        traceback.print_exc()
+        try:
+            send_notification("⚠️ 請求書処理でエラーが発生しました:\n{}".format(e))
+        except Exception:
+            pass
         sys.exit(1)
