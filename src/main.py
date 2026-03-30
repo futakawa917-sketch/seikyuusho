@@ -16,6 +16,7 @@ from src.drive_client import (
 )
 from src.invoice_parser import parse_pdf, parse_text
 from src.line_notifier import send_notification, format_invoice_summary, format_monthly_summary
+from src.downloader import find_and_download_pdfs
 
 
 def process_invoices():
@@ -53,10 +54,34 @@ def process_invoices():
                     print("    🔍 PDF解析中...")
                     invoice_data = parse_pdf(attachment["data"])
 
-        # PDF添付がない場合はメール本文で解析（LINE通知用、Driveには保存しない）
+        # PDF添付がない場合、メール本文のリンクからPDFダウンロードを試みる
+        if not email["attachments"] and email["body"]:
+            print("    🔗 ダウンロードリンクを探索中...")
+            downloaded, failed_urls = find_and_download_pdfs(email["body"])
+
+            for dl_file in downloaded:
+                print("    📎 リンクからPDF保存: {}".format(dl_file["filename"]))
+                upload_file(drive, folder_id, dl_file["filename"], dl_file["data"])
+
+                if invoice_data is None:
+                    print("    🔍 PDF解析中...")
+                    invoice_data = parse_pdf(dl_file["data"])
+
+            if failed_urls:
+                print("    ⚠️ ダウンロードできないリンクあり（手動確認が必要）")
+
+        # それでも解析できない場合はメール本文で解析
         if invoice_data is None and email["body"]:
             print("    🔍 メール本文を解析中...")
             invoice_data = parse_text(email["body"], email["subject"], email["sender"])
+
+        # ダウンロードできなかったリンクがある場合、通知に追記
+        if invoice_data and not email["attachments"]:
+            try:
+                if failed_urls:
+                    invoice_data["manual_download"] = "手動DL必要: " + ", ".join(failed_urls[:2])
+            except NameError:
+                pass
 
         if invoice_data:
             invoice_data["email_subject"] = email["subject"]

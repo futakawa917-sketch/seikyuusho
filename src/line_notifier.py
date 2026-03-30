@@ -72,6 +72,9 @@ def format_invoice_summary(invoices):
         lines.append("   口座: {}".format(bank_info))
         if description:
             lines.append("   内容: {}".format(description))
+        manual = inv.get("manual_download")
+        if manual:
+            lines.append("   ⚠️ {}".format(manual))
         lines.append("")
 
     return "\n".join(lines)
