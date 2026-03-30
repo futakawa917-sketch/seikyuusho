@@ -77,6 +77,48 @@ def format_invoice_summary(invoices):
     return "\n".join(lines)
 
 
+def format_monthly_summary(invoices, year, month):
+    """月末サマリー用のメッセージをフォーマットする。
+
+    Args:
+        invoices: その月の請求書データリスト
+        year: 年
+        month: 月
+
+    Returns:
+        str: フォーマット済みメッセージ
+    """
+    if not invoices:
+        return "📊 {}年{}月の請求書はありませんでした。".format(year, month)
+
+    total = 0
+    lines = ["📊 {}年{}月 請求書まとめ（{}件）\n".format(year, month, len(invoices))]
+
+    # 期限順にソート
+    sorted_invoices = sorted(invoices, key=lambda x: x.get("due_date") or "9999-99-99")
+
+    for i, inv in enumerate(sorted_invoices, 1):
+        issuer = inv.get("issuer") or "不明"
+        amount = inv.get("amount")
+        due_date = inv.get("due_date") or "未記載"
+        bank_info = inv.get("bank_info") or "未記載"
+
+        if amount:
+            total += amount
+        amount_str = "¥{:,.0f}".format(amount) if amount else "未記載"
+
+        lines.append("{}. {}".format(i, issuer))
+        lines.append("   金額: {}".format(amount_str))
+        lines.append("   期限: {}".format(due_date))
+        lines.append("   口座: {}".format(bank_info))
+        lines.append("")
+
+    lines.append("━━━━━━━━━━━━━━")
+    lines.append("合計: ¥{:,.0f}".format(total))
+
+    return "\n".join(lines)
+
+
 def _split_message(message, max_length):
     """メッセージを指定文字数で分割する。"""
     chunks = []

@@ -114,3 +114,52 @@ def upload_text_as_file(service, folder_id, filename, text):
         str: アップロードされたファイルのID
     """
     return upload_file(service, folder_id, filename, text.encode("utf-8"), mime_type="text/plain")
+
+
+def save_invoice_data(service, folder_id, invoice_data):
+    """解析済み請求書データをJSONとしてDriveに保存する。
+
+    Args:
+        service: Drive APIサービス
+        folder_id: 保存先フォルダID
+        invoice_data: 解析済み請求書データ（dict）
+
+    Returns:
+        str: アップロードされたファイルのID
+    """
+    issuer = invoice_data.get("issuer") or "unknown"
+    safe_issuer = issuer.replace("/", "_").replace("\\", "_")
+    filename = "invoice_{}.json".format(safe_issuer)
+    data = json.dumps(invoice_data, ensure_ascii=False, indent=2).encode("utf-8")
+    return upload_file(service, folder_id, filename, data, mime_type="application/json")
+
+
+def load_monthly_invoice_data(service, year, month):
+    """月別フォルダから全ての請求書JSONデータを読み込む。
+
+    Args:
+        service: Drive APIサービス
+        year: 年（int）
+        month: 月（int）
+
+    Returns:
+        list[dict]: 請求書データのリスト
+    """
+    root_id = os.environ.get("DRIVE_ROOT_FOLDER_ID")
+    invoice_folder_id = get_or_create_folder(service, "請求書", root_id)
+    year_folder_id = get_or_create_folder(service, "{}年".format(year), invoice_folder_id)
+    month_folder_id = get_or_create_folder(service, "{:02d}月".format(month), year_folder_id)
+
+    query = "'{}' in parents and name contains 'invoice_' and name contains '.json' and trashed = false".format(month_folder_id)
+    results = service.files().list(q=query, fields="files(id, name)").execute()
+    files = results.get("files", [])
+
+    invoices = []
+    for f in files:
+        content = service.files().get_media(fileId=f["id"]).execute()
+        try:
+            invoices.append(json.loads(content.decode("utf-8")))
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            pass
+
+    return invoices
