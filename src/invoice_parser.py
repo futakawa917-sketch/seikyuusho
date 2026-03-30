@@ -103,7 +103,10 @@ def _parse_response(response) -> dict:
         text = "\n".join(lines[1:-1])
 
     try:
-        return json.loads(text)
+        result = json.loads(text)
+        if isinstance(result, list):
+            return result[0] if result else {}
+        return result
     except json.JSONDecodeError:
         return {
             "issuer": None,
