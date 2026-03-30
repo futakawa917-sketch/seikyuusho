@@ -3,28 +3,42 @@ import os
 import requests
 
 
-LINE_NOTIFY_URL = "https://notify-api.line.me/api/notify"
+LINE_MESSAGING_API_URL = "https://api.line.me/v2/bot/message/broadcast"
 
 
 def send_notification(message: str):
-    """LINE Notifyでメッセージを送信する。
+    """LINE Messaging APIでメッセージをブロードキャスト送信する。
+
+    友だち追加している全ユーザーに送信される。
 
     Args:
-        message: 送信するメッセージ（最大1000文字）
+        message: 送信するメッセージ（最大5000文字）
     """
-    token = os.environ["LINE_NOTIFY_TOKEN"]
-    headers = {"Authorization": f"Bearer {token}"}
+    token = os.environ["LINE_CHANNEL_ACCESS_TOKEN"]
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "Content-Type": "application/json",
+    }
 
-    # LINE Notifyの文字数制限（1000文字）に対応
-    if len(message) > 1000:
-        chunks = _split_message(message, 1000)
-        for chunk in chunks:
-            requests.post(LINE_NOTIFY_URL, headers=headers, data={"message": chunk})
+    # Messaging APIの1メッセージ最大5000文字に対応
+    if len(message) > 5000:
+        chunks = _split_message(message, 5000)
     else:
-        requests.post(LINE_NOTIFY_URL, headers=headers, data={"message": message})
+        chunks = [message]
+
+    for chunk in chunks:
+        payload = {
+            "messages": [
+                {
+                    "type": "text",
+                    "text": chunk,
+                }
+            ]
+        }
+        requests.post(LINE_MESSAGING_API_URL, headers=headers, json=payload)
 
 
-def format_invoice_summary(invoices: list[dict]) -> str:
+def format_invoice_summary(invoices):
     """請求書情報リストをLINE通知用のメッセージにフォーマットする。
 
     Args:
@@ -39,9 +53,9 @@ def format_invoice_summary(invoices: list[dict]) -> str:
         str: フォーマット済みメッセージ
     """
     if not invoices:
-        return "\n請求書の新着はありませんでした。"
+        return "請求書の新着はありませんでした。"
 
-    lines = [f"\n📋 請求書サマリー（{len(invoices)}件）\n"]
+    lines = ["📋 請求書サマリー（{}件）\n".format(len(invoices))]
 
     for i, inv in enumerate(invoices, 1):
         issuer = inv.get("issuer") or "不明"
@@ -50,20 +64,20 @@ def format_invoice_summary(invoices: list[dict]) -> str:
         bank_info = inv.get("bank_info") or "未記載"
         description = inv.get("description") or ""
 
-        amount_str = f"¥{amount:,.0f}" if amount else "未記載"
+        amount_str = "¥{:,.0f}".format(amount) if amount else "未記載"
 
-        lines.append(f"{i}. {issuer}")
-        lines.append(f"   金額: {amount_str}")
-        lines.append(f"   期限: {due_date}")
-        lines.append(f"   口座: {bank_info}")
+        lines.append("{}. {}".format(i, issuer))
+        lines.append("   金額: {}".format(amount_str))
+        lines.append("   期限: {}".format(due_date))
+        lines.append("   口座: {}".format(bank_info))
         if description:
-            lines.append(f"   内容: {description}")
+            lines.append("   内容: {}".format(description))
         lines.append("")
 
     return "\n".join(lines)
 
 
-def _split_message(message: str, max_length: int) -> list[str]:
+def _split_message(message, max_length):
     """メッセージを指定文字数で分割する。"""
     chunks = []
     while message:

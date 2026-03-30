@@ -2,7 +2,8 @@ import io
 import json
 import os
 
-from google.oauth2.service_account import Credentials
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaIoBaseUpload
 
@@ -11,11 +12,18 @@ SCOPES = ["https://www.googleapis.com/auth/drive.file"]
 
 
 def get_drive_service():
-    """Google Drive APIサービスを初期化して返す。"""
-    creds = Credentials.from_service_account_info(
-        json.loads(os.environ["GOOGLE_CREDENTIALS"]),
+    """Google Drive APIサービスを初期化して返す（OAuth リフレッシュトークン方式）。"""
+    token_data = json.loads(os.environ["GOOGLE_OAUTH_TOKEN"])
+    creds = Credentials(
+        token=token_data.get("access_token"),
+        refresh_token=token_data["refresh_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=token_data["client_id"],
+        client_secret=token_data["client_secret"],
         scopes=SCOPES,
     )
+    if creds.expired or not creds.valid:
+        creds.refresh(Request())
     return build("drive", "v3", credentials=creds)
 
 

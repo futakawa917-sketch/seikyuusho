@@ -1,7 +1,10 @@
 import base64
+import json
 import os
 from email.utils import parsedate_to_datetime
-from google.oauth2.service_account import Credentials
+
+from google.oauth2.credentials import Credentials
+from google.auth.transport.requests import Request
 from googleapiclient.discovery import build
 
 
@@ -12,19 +15,19 @@ SCOPES = [
 
 
 def get_gmail_service():
-    """Gmail APIサービスを初期化して返す。"""
-    creds = Credentials.from_service_account_info(
-        _load_credentials(),
+    """Gmail APIサービスを初期化して返す（OAuth リフレッシュトークン方式）。"""
+    token_data = json.loads(os.environ["GOOGLE_OAUTH_TOKEN"])
+    creds = Credentials(
+        token=token_data.get("access_token"),
+        refresh_token=token_data["refresh_token"],
+        token_uri="https://oauth2.googleapis.com/token",
+        client_id=token_data["client_id"],
+        client_secret=token_data["client_secret"],
         scopes=SCOPES,
-        subject=os.environ["GMAIL_USER_EMAIL"],
     )
+    if creds.expired or not creds.valid:
+        creds.refresh(Request())
     return build("gmail", "v1", credentials=creds)
-
-
-def _load_credentials():
-    """環境変数からGoogle認証情報を読み込む。"""
-    import json
-    return json.loads(os.environ["GOOGLE_CREDENTIALS"])
 
 
 def get_processed_label_id(service, user_id="me"):
