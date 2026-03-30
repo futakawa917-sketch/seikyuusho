@@ -53,18 +53,10 @@ def process_invoices():
                     print("    🔍 PDF解析中...")
                     invoice_data = parse_pdf(attachment["data"])
 
-        # PDF添付がない場合はメール本文で解析
+        # PDF添付がない場合はメール本文で解析（LINE通知用、Driveには保存しない）
         if invoice_data is None and email["body"]:
             print("    🔍 メール本文を解析中...")
             invoice_data = parse_text(email["body"], email["subject"], email["sender"])
-
-            # 本文をテキストファイルとしても保存
-            safe_subject = email["subject"].replace("/", "_").replace("\\", "_")
-            filename = "{}.txt".format(safe_subject)
-            content = "件名: {}\n送信者: {}\n日付: {}\n\n{}".format(
-                email["subject"], email["sender"], email["date"], email["body"]
-            )
-            upload_text_as_file(drive, folder_id, filename, content)
 
         if invoice_data:
             invoice_data["email_subject"] = email["subject"]
