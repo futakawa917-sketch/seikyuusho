@@ -1,10 +1,19 @@
-name: スプレッドシート同期（一時）
+name: ユーティリティ（一時）
 
 on:
   workflow_dispatch:
+    inputs:
+      action:
+        description: "実行内容"
+        required: true
+        default: "reprocess"
+        type: choice
+        options:
+          - reprocess
+          - sync_sheet
 
 jobs:
-  sync:
+  run:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -12,7 +21,26 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install -r requirements.txt
-      - name: Sync latest invoice to sheet
+      - name: Reprocess
+        if: github.event.inputs.action == 'reprocess'
+        env:
+          GOOGLE_OAUTH_TOKEN: ${{ secrets.GOOGLE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          DRIVE_ROOT_FOLDER_ID: ${{ secrets.DRIVE_ROOT_FOLDER_ID }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: python -m src.reprocess "日本補助金士協会"
+      - name: Process invoices
+        if: github.event.inputs.action == 'reprocess'
+        env:
+          GOOGLE_OAUTH_TOKEN: ${{ secrets.GOOGLE_OAUTH_TOKEN }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+          DRIVE_ROOT_FOLDER_ID: ${{ secrets.DRIVE_ROOT_FOLDER_ID }}
+          SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
+        run: python -m src.main process
+      - name: Sync sheet
+        if: github.event.inputs.action == 'sync_sheet'
         env:
           GOOGLE_OAUTH_TOKEN: ${{ secrets.GOOGLE_OAUTH_TOKEN }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
