@@ -90,7 +90,7 @@ def find_and_download_pdfs(email_body):
     """
     urls = extract_download_urls(email_body)
     if not urls:
-        return [], []
+        return [], [], []
 
     # PDFの可能性が高いURLを優先
     pdf_likely = []
