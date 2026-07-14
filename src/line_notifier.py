@@ -35,7 +35,13 @@ def send_notification(message: str):
                 }
             ]
         }
-        requests.post(LINE_MESSAGING_API_URL, headers=headers, json=payload)
+        response = requests.post(
+            LINE_MESSAGING_API_URL,
+            headers=headers,
+            json=payload,
+            timeout=30,
+        )
+        response.raise_for_status()
 
 
 def format_invoice_summary(invoices):

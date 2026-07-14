@@ -41,6 +41,9 @@ Gmailに届く請求書を自動で処理するツール。
 - **自動実行**: 毎日朝9時（JST）にGitHub Actionsで自動実行
 - **手動実行**: Actions タブから "Run workflow" で手動実行
 
+> Google OAuth同意画面が「テスト」の場合、リフレッシュトークンは7日で失効します。
+> 継続運用する前に、Google Cloud Consoleの「対象」画面でアプリを本番公開してください。
+
 ### ローカル実行
 
 ```bash
@@ -48,4 +51,10 @@ pip install -r requirements.txt
 cp .env.example .env
 # .env に認証情報を記入
 python -m src.main
+```
+
+認証状態だけを確認する場合:
+
+```bash
+python -m src.main healthcheck
 ```

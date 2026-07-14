@@ -1,9 +1,10 @@
 """請求書自動管理ツール
 
-3つのモードで動作:
+4つのモードで動作:
 - process: 新着メールを処理してLINEに即時通知 + スプレッドシート記録
 - summary: 当月の請求書をまとめてLINEに月末サマリー送信
 - reminder: 支払い期限が近い請求書をLINEでリマインド
+- healthcheck: 必須設定とGoogle API認証を検証
 """
 
 import calendar
@@ -143,8 +144,10 @@ def send_monthly_summary():
     month = now.month
 
     last_day = calendar.monthrange(year, month)[1]
-    if now.day != last_day:
-        print("今日は{}月{}日です（月末は{}日）。手動実行として続行します。".format(month, now.day, last_day))
+    force = os.environ.get("FORCE_MONTHLY_SUMMARY", "").lower() in ("1", "true", "yes")
+    if now.day != last_day and not force:
+        print("今日は{}月{}日です（月末は{}日）。月次サマリーをスキップします。".format(month, now.day, last_day))
+        return
 
     print("📊 {}年{}月の請求書サマリーを作成中...".format(year, month))
 
@@ -205,11 +208,44 @@ def send_reminder():
     print("✅ リマインダーを送信しました。")
 
 
+def healthcheck():
+    """必須設定とGoogle APIの認証状態を確認する。"""
+    required = [
+        "GOOGLE_OAUTH_TOKEN",
+        "ANTHROPIC_API_KEY",
+        "LINE_CHANNEL_ACCESS_TOKEN",
+        "SPREADSHEET_ID",
+    ]
+    missing = [name for name in required if not os.environ.get(name)]
+    if missing:
+        raise RuntimeError("未設定の環境変数: {}".format(", ".join(missing)))
+
+    print("🔍 Gmail APIを確認中...")
+    gmail = get_gmail_service()
+    gmail.users().getProfile(userId="me").execute()
+
+    print("🔍 Google Drive APIを確認中...")
+    drive = get_drive_service()
+    drive.about().get(fields="user").execute()
+
+    print("🔍 Google Sheets APIを確認中...")
+    from src.spreadsheet_client import get_sheets_service
+    sheets = get_sheets_service()
+    sheets.spreadsheets().get(
+        spreadsheetId=os.environ["SPREADSHEET_ID"],
+        fields="spreadsheetId",
+    ).execute()
+
+    print("✅ 設定とGoogle API認証は正常です。")
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "process"
 
     try:
-        if mode == "summary":
+        if mode == "healthcheck":
+            healthcheck()
+        elif mode == "summary":
             send_monthly_summary()
         elif mode == "reminder":
             send_reminder()
