@@ -11,6 +11,7 @@
 """
 
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -37,7 +38,11 @@ def main():
     print(f"📄 認証ファイル: {secret_file}")
 
     flow = InstalledAppFlow.from_client_secrets_file(str(secret_file), scopes=SCOPES)
-    creds = flow.run_local_server(port=0)
+    auth_options = {"port": 0, "prompt": "consent"}
+    login_hint = os.environ.get("GOOGLE_LOGIN_HINT")
+    if login_hint:
+        auth_options["login_hint"] = login_hint
+    creds = flow.run_local_server(**auth_options)
 
     # client_id と client_secret を取得
     with open(secret_file) as f:
