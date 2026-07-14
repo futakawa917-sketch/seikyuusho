@@ -56,7 +56,12 @@ def fetch_invoice_emails(service, user_id="me"):
             - body: メール本文
             - attachments: 添付ファイルリスト [{filename, data}]
     """
-    query = "-label:請求書処理済み -from:@google.com -from:@accounts.google.com -from:noreply -category:promotions -category:social newer_than:1d"
+    query = (
+        "-label:請求書処理済み "
+        "-from:@google.com -from:@accounts.google.com "
+        "-category:promotions -category:social "
+        "{subject:請求 subject:invoice} newer_than:1d"
+    )
     results = service.users().messages().list(userId=user_id, q=query, maxResults=20).execute()
     messages = results.get("messages", [])
 
