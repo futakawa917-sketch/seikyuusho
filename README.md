@@ -36,20 +36,22 @@ Gmailに届く請求書を自動で処理するツール。
 | `LINE_NOTIFY_TOKEN` | LINE Notifyトークン |
 | `DRIVE_ROOT_FOLDER_ID` | Drive保存先フォルダID（省略可） |
 
-### 4. 即時検知（Google Apps Script）
+### 4. クラウド自動実行（GitHub Actions）
 
-`gas/trigger.gs` を `snshack.online@gmail.com` のGoogle Apps Scriptへ登録し、
-スクリプト プロパティを設定して `setupTrigger` を1回実行します。
+GitHub Actionsが5分ごとに `snshack.online@gmail.com` の新着請求書を確認します。
+処理はGitHub上で動くため、Macを閉じていても停止しません。
 
-- Gmailを1分ごとに確認します（Gmailには受信イベントのトリガーがないため）
+- GitHub Actionsの最短間隔に合わせて5分ごとに確認します
 - 件名に `請求` または `invoice` を含む新着メールだけが対象です
 - メールの既読・未読状態は変更しません
-- GitHub Actionsへ起動要求を送った後、Drive保存と台帳記録を実行します
-- 毎朝9時の実行は、即時検知が止まった場合の予備として残します
+- Drive保存と台帳記録もクラウド上で実行します
+- 毎朝9時には支払リマインダーと月末サマリーの判定も実行します
+
+より短い1分間隔が必要な場合だけ、`gas/trigger.gs` のGoogle Apps Scriptを追加できます。
 
 ### 5. 実行
 
-- **自動実行**: 新着を1分ごとに検知。毎日朝9時（JST）にも予備実行
+- **自動実行**: GitHub Actionsで5分ごとに新着を確認
 - **手動実行**: Actions タブから "Run workflow" で手動実行
 
 > Google OAuth同意画面が「テスト」の場合、リフレッシュトークンは7日で失効します。
