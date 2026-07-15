@@ -17,14 +17,18 @@ on:
           - summary
           - reminder
           - healthcheck
-  # 毎朝9時(JST)に請求書処理 + リマインダー + 月末サマリー
+  # 請求書は5分ごとに確認。毎朝9時(JST)はリマインダー + 月末サマリーも実行
   schedule:
+    - cron: "*/5 * * * *"
     - cron: "0 0 * * *"
 
 jobs:
   process-invoices:
     if: github.event_name == 'schedule' || github.event_name == 'repository_dispatch' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'process')
     runs-on: ubuntu-latest
+    concurrency:
+      group: invoice-processing
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v6
@@ -42,7 +46,7 @@ jobs:
         run: python -m src.main process
 
   daily-reminder:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'reminder')
+    if: (github.event_name == 'schedule' && github.event.schedule == '0 0 * * *') || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'reminder')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -61,7 +65,7 @@ jobs:
         run: python -m src.main reminder
 
   monthly-summary:
-    if: github.event_name == 'schedule' || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'summary')
+    if: (github.event_name == 'schedule' && github.event.schedule == '0 0 * * *') || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'summary')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
