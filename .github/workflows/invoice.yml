@@ -17,6 +17,7 @@ on:
           - summary
           - reminder
           - healthcheck
+          - watch
   # 請求書は5分ごとに確認。毎朝9時(JST)はリマインダー + 月末サマリーも実行
   schedule:
     - cron: "*/5 * * * *"
@@ -102,3 +103,20 @@ jobs:
           DRIVE_ROOT_FOLDER_ID: ${{ secrets.DRIVE_ROOT_FOLDER_ID }}
           SPREADSHEET_ID: ${{ secrets.SPREADSHEET_ID }}
         run: python -m src.main healthcheck
+
+  renew-gmail-watch:
+    if: (github.event_name == 'schedule' && github.event.schedule == '0 0 * * *') || (github.event_name == 'workflow_dispatch' && github.event.inputs.mode == 'watch')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Renew Gmail push watch
+        env:
+          GOOGLE_OAUTH_TOKEN: ${{ secrets.GOOGLE_OAUTH_TOKEN }}
+          GMAIL_PUBSUB_TOPIC: projects/hotel-image-automation-499506/topics/invoice-gmail-events
+          LINE_CHANNEL_ACCESS_TOKEN: ${{ secrets.LINE_CHANNEL_ACCESS_TOKEN }}
+        run: python -m src.main watch
