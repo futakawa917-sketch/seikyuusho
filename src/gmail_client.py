@@ -30,6 +30,21 @@ def get_gmail_service():
     return build("gmail", "v1", credentials=creds)
 
 
+def renew_gmail_watch(service, topic_name, user_id="me"):
+    """Gmail受信箱のPub/Sub監視を開始または更新する。"""
+    if not topic_name.startswith("projects/") or "/topics/" not in topic_name:
+        raise ValueError("GMAIL_PUBSUB_TOPIC は projects/.../topics/... 形式で指定してください。")
+
+    return service.users().watch(
+        userId=user_id,
+        body={
+            "topicName": topic_name,
+            "labelIds": ["INBOX"],
+            "labelFilterBehavior": "INCLUDE",
+        },
+    ).execute()
+
+
 def get_processed_label_id(service, user_id="me"):
     """「処理済み」ラベルのIDを取得。なければ作成する。"""
     labels = service.users().labels().list(userId=user_id).execute()

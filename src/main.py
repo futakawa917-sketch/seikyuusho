@@ -1,10 +1,11 @@
 """請求書自動管理ツール
 
-4つのモードで動作:
+5つのモードで動作:
 - process: 新着メールを処理してLINEに即時通知 + スプレッドシート記録
 - summary: 当月の請求書をまとめてLINEに月末サマリー送信
 - reminder: 支払い期限が近い請求書をLINEでリマインド
 - healthcheck: 必須設定とGoogle API認証を検証
+- watch: GmailのPub/Sub監視を開始または更新
 """
 
 import calendar
@@ -239,12 +240,28 @@ def healthcheck():
     print("✅ 設定とGoogle API認証は正常です。")
 
 
+def renew_watch():
+    """Gmail受信箱のPub/Sub監視を更新する。"""
+    topic_name = os.environ.get("GMAIL_PUBSUB_TOPIC")
+    if not topic_name:
+        raise RuntimeError("GMAIL_PUBSUB_TOPIC が未設定です。")
+
+    from src.gmail_client import renew_gmail_watch
+
+    print("📡 Gmail受信イベントの監視を更新中...")
+    response = renew_gmail_watch(get_gmail_service(), topic_name)
+    expiration = datetime.fromtimestamp(int(response["expiration"]) / 1000, tz=JST)
+    print("✅ Gmail監視を更新しました。期限: {}".format(expiration.isoformat()))
+
+
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "process"
 
     try:
         if mode == "healthcheck":
             healthcheck()
+        elif mode == "watch":
+            renew_watch()
         elif mode == "summary":
             send_monthly_summary()
         elif mode == "reminder":
